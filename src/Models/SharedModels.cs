@@ -27,17 +27,13 @@ public sealed class EraListRequest
 /// </summary>
 public sealed class EraListResponse
 {
-    /// <summary>
-    /// Store this value and pass as EraId on the next poll to
-    /// receive only new ERAs since this call.
-    /// </summary>
     [JsonPropertyName("last_eraid")]
     public string? LastEraId { get; set; }
 
-    [JsonPropertyName("eras")]
+    [JsonPropertyName("era")]            // was "eras"
     public List<EraHeader>? Eras { get; set; }
 
-    [JsonPropertyName("errors")]
+    [JsonPropertyName("error")]          // was "errors"
     public List<ApiError>? Errors { get; set; }
 
     [JsonIgnore]
@@ -97,7 +93,7 @@ public sealed class EraDetailResponse
     [JsonPropertyName("claims")]
     public List<EraClaimDetail>? Claims { get; set; }
 
-    [JsonPropertyName("errors")]
+    [JsonPropertyName("error")]
     public List<ApiError>? Errors { get; set; }
 
     [JsonIgnore]
@@ -164,10 +160,10 @@ public sealed class EraServiceLine
 
 public sealed class PayerListResponse
 {
-    [JsonPropertyName("payers")]
+    [JsonPropertyName("payer")]
     public List<PayerInfo>? Payers { get; set; }
 
-    [JsonPropertyName("errors")]
+    [JsonPropertyName("error")]
     public List<ApiError>? Errors { get; set; }
 
     [JsonIgnore]
@@ -185,10 +181,10 @@ public sealed class PayerInfo
     [JsonPropertyName("claim_types")]
     public string? ClaimTypes { get; set; }
 
-    [JsonPropertyName("elig_supported")]
+    [JsonPropertyName("eligibility")]
     public string? EligibilitySupported { get; set; }
 
-    [JsonPropertyName("era_supported")]
+    [JsonPropertyName("era")]
     public string? EraSupported { get; set; }
 
     [JsonIgnore]
@@ -209,10 +205,10 @@ public sealed class PayerInfo
 /// </summary>
 public sealed class ApiError
 {
-    [JsonPropertyName("code")]
+    [JsonPropertyName("error_code")]
     public string? Code { get; set; }
 
-    [JsonPropertyName("message")]
+    [JsonPropertyName("error_mesg")]
     public string? Message { get; set; }
 
     [JsonPropertyName("field")]

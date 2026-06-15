@@ -4,18 +4,23 @@ using ClaimMD.Client.Models;
 // ─────────────────────────────────────────────────────────
 //  PASTE YOUR CLAIM.MD API KEY HERE
 // ─────────────────────────────────────────────────────────
-const string AccountKey = "YOUR_API_KEY_HERE";
+const string AccountKey = "30212_d9bzH3m2ACbl4T^kc7BRoZTD";
 // ─────────────────────────────────────────────────────────
 
-if (AccountKey == "YOUR_API_KEY_HERE")
+/*if (AccountKey == "[ 30212_d9bzH3m2ACbl4T^kc7BRoZTD ]")
 {
     Console.ForegroundColor = ConsoleColor.Red;
     Console.WriteLine("Please set your AccountKey in Program.cs before running.");
     Console.ResetColor();
     return;
 }
-
-using var client = new ClaimMdClient(AccountKey);
+*/
+using var client = new ClaimMdClient(new ClaimMD.Client.Configuration.ClaimMdOptions
+{
+    AccountKey = AccountKey,
+    BaseUrl = "https://svc.claim.md",
+    TimeoutSeconds = 120   // ← already set to 120 in the new zip
+});
 
 await RunStep("1 — Payer List (connectivity + auth check)", async () =>
 {
@@ -35,24 +40,55 @@ await RunStep("1 — Payer List (connectivity + auth check)", async () =>
     Console.WriteLine("  Sample payers:");
     foreach (var p in payers.Take(5))
         Console.WriteLine($"    [{p.PayerId}] {p.PayerName}  elig={p.EligibilitySupported}  era={p.EraSupported}");
+    var test = (result.Payers ?? [])
+    .Where(p => p.PayerName!.Contains("test", StringComparison.OrdinalIgnoreCase) ||
+                p.PayerName!.Contains("sample", StringComparison.OrdinalIgnoreCase) ||
+                p.PayerName!.Contains("demo", StringComparison.OrdinalIgnoreCase))
+    .ToList();
+    foreach (var p in test)
+        Console.WriteLine($"  [{p.PayerId}] {p.PayerName}");
+    //Console.WriteLine("\n  Searching for Athena...");
+    //var athena = payers.Where(p => p.PayerName != null &&
+    //    p.PayerName.Contains("Athena", StringComparison.OrdinalIgnoreCase) ||
+    //    p.PayerName != null &&
+    //    p.PayerName.Contains("Aetna", StringComparison.OrdinalIgnoreCase))
+    //    .ToList();
+    //foreach (var p in athena)
+    //    Console.WriteLine($"    [{p.PayerId}] {p.PayerName}");
 });
 
 await RunStep("2 — Eligibility Check (JSON)", async () =>
 {
+    using var dbg = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+    var f = new FormUrlEncodedContent(new Dictionary<string, string>
+    {
+        ["AccountKey"] = AccountKey,
+        ["ins_last"] = "SMITH",        // exact last name uppercase
+        ["ins_first"] = "JANE",         // exact first name uppercase
+        ["ins_dob"] = "19800315",     // real DOB
+        ["ins_number"] = "W123456789",   // real member ID with W
+        ["prov_npi"] = "your NPI",
+        ["prov_taxid"] = "your taxid",
+        ["payerid"] = "60054",
+        ["dos"] = DateTime.Today.ToString("yyyyMMdd"),
+        ["pat_rel"] = "18",
+        ["service_type"] = "30",
+    });
+    var r = await dbg.PostAsync("https://svc.claim.md/services/eligdata/", f);
+    var xml = await r.Content.ReadAsStringAsync();
+    Console.WriteLine(xml[..Math.Min(1000, xml.Length)]);
     var request = new EligibilityRequest
     {
-        // ── Edit these fields with real or test values ──────────────
-        InsuredLastName    = "Smith",
-        InsuredFirstName   = "Jane",
-        InsuredDateOfBirth = "19800315",        // YYYYMMDD
-        InsuredMemberId    = "TEST123456",
-        PayerId            = "00431",           // Replace with a valid payer ID from step 1
-        ProviderNpi        = "1234567890",
-        ProviderTaxId      = "123456789",
-        DateOfService      = DateTime.Today.ToString("yyyyMMdd"),
-        PatientRelationship = "18",             // 18 = Self
-        ServiceTypeCode    = "30",              // 30 = Health benefit plan
-        // ───────────────────────────────────────────────────────────
+        InsuredLastName = "Herron",
+        InsuredFirstName = "Fatima",
+        InsuredDateOfBirth = "19920801",        // e.g. if DOB is March 15 1980 → "19800315" 
+        InsuredMemberId = "W279726887",
+        PayerId = "TEST1",   // ← need to find Athena's payer ID from Step 1 output
+        ProviderNpi = "1111111112",
+        ProviderTaxId = "999999999",
+        DateOfService = DateTime.Today.ToString("yyyyMMdd"),
+        PatientRelationship = "18",
+        ServiceTypeCode = "42",   // change to 42 = Home Health Care
     };
 
     var result = await client.CheckEligibilityAsync(request);

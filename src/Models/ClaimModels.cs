@@ -11,15 +11,13 @@ namespace ClaimMD.Client.Models;
 /// </summary>
 public sealed class ClaimUploadResponse
 {
-    /// <summary>Human-readable summary message from Claim.MD (e.g. "Received 2 claims in file: sample837.txt").</summary>
     [JsonPropertyName("messages")]
     public string? Messages { get; set; }
 
-    /// <summary>Per-claim acknowledgment details.</summary>
-    [JsonPropertyName("claims")]
+    [JsonPropertyName("claim")]          // was "claims"
     public List<ClaimAcknowledgment>? Claims { get; set; }
 
-    [JsonPropertyName("errors")]
+    [JsonPropertyName("error")]          // was "errors"
     public List<ApiError>? Errors { get; set; }
 
     [JsonIgnore]
@@ -114,17 +112,13 @@ public sealed class ClaimMessage
 /// </summary>
 public sealed class ClaimStatusResponse
 {
-    /// <summary>
-    /// Store this value and send it as ResponseID on the next poll
-    /// to receive only new updates since this call.
-    /// </summary>
     [JsonPropertyName("last_responseid")]
     public string? LastResponseId { get; set; }
 
-    [JsonPropertyName("claims")]
+    [JsonPropertyName("claim")]          // was "claims"
     public List<ClaimStatusDetail>? Claims { get; set; }
 
-    [JsonPropertyName("errors")]
+    [JsonPropertyName("error")]          // was "errors"
     public List<ApiError>? Errors { get; set; }
 
     [JsonIgnore]
@@ -187,7 +181,7 @@ public sealed class ClaimStatusDetail
     [JsonPropertyName("response_time")]
     public string? ResponseTime { get; set; }
 
-    [JsonPropertyName("messages")]
+    [JsonPropertyName("message")]
     public List<ClaimMessage>? Messages { get; set; }
 
     /// <summary>Human-readable status description.</summary>
@@ -212,7 +206,7 @@ public sealed class UploadedFilesResponse
     [JsonPropertyName("files")]
     public List<UploadedFileInfo>? Files { get; set; }
 
-    [JsonPropertyName("errors")]
+    [JsonPropertyName("error")]
     public List<ApiError>? Errors { get; set; }
 
     [JsonIgnore]

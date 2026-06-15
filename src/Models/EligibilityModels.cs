@@ -102,19 +102,24 @@ public sealed class EligibilityRequest
 /// </summary>
 public sealed class EligibilityResponse
 {
-    [JsonPropertyName("errors")]
+    [JsonPropertyName("error")]
     public List<ApiError>? Errors { get; set; }
 
     [JsonPropertyName("subscriber")]
-    public EligibilitySubscriber? Subscriber { get; set; }
+    public List<EligibilitySubscriber>? SubscriberList { get; set; }
 
     [JsonPropertyName("payer")]
-    public EligibilityPayer? Payer { get; set; }
+    public List<EligibilityPayer>? PayerList { get; set; }
 
-    [JsonPropertyName("benefits")]
+    [JsonPropertyName("benefit")]
     public List<EligibilityBenefit>? Benefits { get; set; }
 
-    /// <summary>True when the response contains no API-level errors.</summary>
+    [JsonIgnore]
+    public EligibilitySubscriber? Subscriber => SubscriberList?.FirstOrDefault();
+
+    [JsonIgnore]
+    public EligibilityPayer? Payer => PayerList?.FirstOrDefault();
+
     [JsonIgnore]
     public bool IsSuccess => Errors == null || Errors.Count == 0;
 }
@@ -169,9 +174,9 @@ public sealed class EligibilityBenefit
     [JsonPropertyName("percent")]
     public string? Percent { get; set; }
 
-    [JsonPropertyName("in_network")]
+    [JsonPropertyName("in_plan_network")]
     public string? InNetwork { get; set; }
 
-    [JsonPropertyName("messages")]
+    [JsonPropertyName("message")]
     public List<string>? Messages { get; set; }
 }

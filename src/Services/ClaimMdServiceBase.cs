@@ -5,6 +5,7 @@ using ClaimMD.Client.Configuration;
 using ClaimMD.Client.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Xml.Linq;
 
 namespace ClaimMD.Client.Services;
 
@@ -51,10 +52,11 @@ internal abstract class ClaimMdServiceBase
         fields["AccountKey"] = Options.AccountKey;
 
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        // Request XML — this is what Claim.MD actually returns
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
         request.Content = new FormUrlEncodedContent(fields);
 
-        Logger.LogDebug("POST {Endpoint} fields={Fields}", endpoint, string.Join(", ", fields.Keys.Where(k => k != "AccountKey")));
+        Logger.LogDebug("POST {Endpoint}", endpoint);
 
         using var response = await HttpClient.SendAsync(request, ct);
         return await ParseResponseAsync<T>(response, ct);
@@ -133,30 +135,61 @@ internal abstract class ClaimMdServiceBase
     private async Task<T> ParseResponseAsync<T>(HttpResponseMessage response, CancellationToken ct) where T : class
     {
         var raw = await response.Content.ReadAsStringAsync(ct);
-        Logger.LogTrace("Response [{StatusCode}]: {Body}", (int)response.StatusCode, raw);
 
         if (!response.IsSuccessStatusCode)
+            throw new ClaimMdApiException($"HTTP {(int)response.StatusCode}: {raw}");
+
+        // Claim.MD returns XML regardless of Accept header in most endpoints
+        var cleaned = new string(raw.Where(c => c >= 0x20 || c == '\t' || c == '\n' || c == '\r').ToArray());
+        // Prefix attribute names that start with a digit (e.g. 1500_claims → _1500_claims)
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(cleaned, @"(\s)(\d)", "$1_$2");
+        var doc = System.Xml.Linq.XDocument.Parse(sanitized);
+        var root = doc.Root!;
+
+        // Check for errors first
+        var errorEls = root.Elements("error").ToList();
+        if (errorEls.Any())
         {
-            Logger.LogWarning("HTTP {StatusCode} from Claim.MD: {Body}", (int)response.StatusCode, raw);
-            throw new ClaimMdApiException(
-                $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}. Body: {raw}");
+            var errors = errorEls.Select(e => new ApiError
+            {
+                Code = e.Attribute("error_code")?.Value,
+                Message = e.Attribute("error_mesg")?.Value ?? e.Value
+            }).ToList();
+            return (T)CreateErrorResult<T>(errors);
         }
 
-        T? result;
-        try
+        // Convert XML to JSON then deserialize — handles all response types uniformly
+        var json = System.Text.Json.JsonSerializer.Serialize(XmlToDict(root));
+        Logger.LogTrace("Converted JSON: {Json}", json);
+
+        return JsonSerializer.Deserialize<T>(json, JsonOptions)
+            ?? throw new ClaimMdApiException("Empty response.");
+    }
+
+    private static Dictionary<string, object?> XmlToDict(System.Xml.Linq.XElement el)
+    {
+        var dict = new Dictionary<string, object?>();
+
+        foreach (var attr in el.Attributes())
+            dict[attr.Name.LocalName] = (object?)attr.Value;
+
+        var groups = el.Elements().GroupBy(e => e.Name.LocalName);
+        foreach (var group in groups)
         {
-            result = JsonSerializer.Deserialize<T>(raw, JsonOptions);
-        }
-        catch (JsonException ex)
-        {
-            Logger.LogError(ex, "Failed to parse Claim.MD response: {Body}", raw);
-            throw new ClaimMdApiException($"Failed to deserialize response: {ex.Message}", ex);
+            var items = group.Select(e => (object?)XmlToDict(e)).ToList();
+            dict[group.Key] = (object?)items;
         }
 
-        if (result is null)
-            throw new ClaimMdApiException("Claim.MD returned an empty response.");
+        return dict;
+    }
 
-        return result;
+    private static object CreateErrorResult<T>(List<ApiError> errors) where T : class
+    {
+        // All response types have an Errors property — set it via reflection
+        var instance = Activator.CreateInstance<T>();
+        var prop = typeof(T).GetProperty("Errors");
+        prop?.SetValue(instance, errors);
+        return instance;
     }
 
     private static string GetContentType(string filename) =>
